@@ -1,7 +1,7 @@
 
 
 import time
-from typing import List
+from typing import List, Union
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +13,7 @@ from q_learning_agent import QLearningAgent
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
@@ -27,8 +27,8 @@ app.add_middleware(
 # --- Data Models ---
 # We keep elevation here so the frontend doesn't break, but it will be a placeholder.
 class BeamAction(BaseModel):
-    azimuth: float | str
-    elevation: float | str
+    azimuth: Union[float, str]
+    elevation: Union[float, str]
 
 class OptimizationResult(BaseModel):
     success: bool

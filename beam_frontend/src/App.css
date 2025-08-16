@@ -1,1 +1,104 @@
 @import "tailwindcss";
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+  padding: 20px;
+}
+
+button {
+  font-size: calc(8px + 2vmin);
+  padding: 10px 20px;
+  margin: 20px;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 2px solid #61dafb;
+  background-color: #20232a;
+  color: white;
+  transition: background-color 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background-color: #61dafb;
+  color: #20232a;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  background-color: #555;
+  border-color: #777;
+  color: #aaa;
+}
+
+.results-card,
+.error-card {
+  margin-top: 20px;
+  padding: 10px 25px;
+  border-radius: 8px;
+  background-color: #20232a;
+  width: 80%;
+  max-width: 600px;
+  text-align: left;
+  border: 1px solid #61dafb;
+}
+
+.error-card {
+  border-color: #ff6b6b;
+  color: #ffc9c9;
+}
+
+.results-card p,
+.error-card p {
+  font-size: calc(8px + 1.5vmin);
+  margin: 12px 0;
+}
+
+.results-card strong {
+  color: #61dafb;
+}
+
+/* --- NEW: Styles for input fields --- */
+.input-grid {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 20px;
+  background-color: #20232a;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.input-group h3 {
+  margin: 0 0 10px 0;
+  font-size: calc(10px + 1.5vmin);
+  color: #61dafb;
+}
+
+.input-group label {
+  font-size: calc(8px + 1.5vmin);
+}
+
+.input-group input {
+  width: 100px;
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background-color: #3a3f4a;
+  color: white;
+  font-size: calc(8px + 1.5vmin);
+}
