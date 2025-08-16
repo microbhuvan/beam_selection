@@ -1,0 +1,44 @@
+# General
+.DS_Store
+Thumbs.db
+
+# Python / FastAPI Backend (beam_backend)
+# --------------------------------------
+
+# Virtual Environment
+/beam_backend/venv/
+/beam_backend/.venv/
+/beam_backend/env/
+/beam_backend/virtualenv/
+
+# Python cache files
+/beam_backend/__pycache__/
+/beam_backend/*.pyc
+/beam_backend/*.pyo
+/beam_backend/*.pyd
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+
+# React Frontend (beam_frontend)
+# ------------------------------
+
+# Dependencies
+/beam_frontend/node_modules/
+
+# Build output
+/beam_frontend/build/
+
+# Logs
+/beam_frontend/npm-debug.log*
+/beam_frontend/yarn-debug.log*
+/beam_frontend/yarn-error.log*
+
+# Environment variables
+# It's good practice to ignore local environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

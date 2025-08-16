@@ -1,0 +1,6 @@
+Beam Optimizer Learning Project
+- Goal: Build 30-40% of beam selection optimizer
+- Approach: You build, I guide
+- Structure: backend/, frontend/, optimizer/
+- Learning: Hands-on with my guidance
+- Status: Planning phase, ready to start
