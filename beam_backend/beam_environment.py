@@ -1,4 +1,4 @@
-# c:\Users\Mallikarjuna\Desktop\beam_selection - Copy\practice\beam_backend\beam_environment.py
+
 
 import numpy as np
 

@@ -1,4 +1,4 @@
-# c:\Users\Mallikarjuna\Desktop\beam_selection - Copy\practice\beam_backend\q_learning_agent.py
+
 
 import numpy as np
 import random
