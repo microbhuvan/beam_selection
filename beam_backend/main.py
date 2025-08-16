@@ -1,5 +1,3 @@
-
-
 import time
 from typing import List, Union
 from fastapi import FastAPI
@@ -12,7 +10,10 @@ from q_learning_agent import QLearningAgent
 
 app = FastAPI()
 
+# In your previous file, you had 5173, which is common for Vite.
+# I'll add both 3000 (React default) and 5173 to be safe.
 origins = [
+    "http://localhost:3000",
     "http://localhost:5173",
 ]
 
@@ -23,6 +24,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- NEW: Define a model for the incoming request data ---
+# This describes the JSON structure we expect from the frontend.
+class Position(BaseModel):
+    x: float
+    y: float
+
+class OptimizationRequest(BaseModel):
+    tx_position: Position
+    rx_position: Position
+
 
 # --- Data Models ---
 # We keep elevation here so the frontend doesn't break, but it will be a placeholder.
@@ -40,14 +52,15 @@ class OptimizationResult(BaseModel):
 
 # --- API Endpoint ---
 @app.post("/optimize", response_model=OptimizationResult)
-async def optimize_beams():
+async def optimize_beams(request: OptimizationRequest): # <<< KEY CHANGE 1: Added request parameter
     try:
-        print("Received request to /optimize... Starting 2D optimization.")
+        # <<< KEY CHANGE 2: Log the received data for debugging
+        print(f"Received request: TX at ({request.tx_position.x}, {request.tx_position.y}), RX at ({request.rx_position.x}, {request.rx_position.y})")
         start_time = time.time()
 
-        # --- Use 2D positions and the 2D Environment ---
-        tx_position = (0, 0)
-        rx_position = (100, 50)
+        # <<< KEY CHANGE 3: Use positions from the request instead of hardcoded values
+        tx_position = (request.tx_position.x, request.tx_position.y)
+        rx_position = (request.rx_position.x, request.rx_position.y)
 
         env = BeamEnvironment2D(tx_pos=tx_position, rx_pos=rx_position, num_steps=36)
         agent = QLearningAgent(env, alpha=0.1, gamma=0.9, epsilon=0.1)
