@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- Import our 2D Environment and the updated Agent ---
-from beam_environment import BeamEnvironment2D
-from q_learning_agent import QLearningAgent
+# --- Import our new Multi-Link Environment and Agent ---
+from beam_environment import MultiBeamEnvironment2D
+from q_learning_agent import MultiLinkQLearningAgent
 
 app = FastAPI()
 
@@ -25,64 +25,68 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- NEW: Define a model for the incoming request data ---
-# This describes the JSON structure we expect from the frontend.
+# --- Pydantic Models for API Data Structure ---
+
 class Position(BaseModel):
     x: float
     y: float
 
-class OptimizationRequest(BaseModel):
+class Link(BaseModel):
     tx_position: Position
     rx_position: Position
 
+class OptimizationRequest(BaseModel):
+    links: List[Link]
 
-# --- Data Models ---
-# We keep elevation here so the frontend doesn't break, but it will be a placeholder.
 class BeamAction(BaseModel):
     azimuth: Union[float, str]
     elevation: Union[float, str]
 
+class LinkResult(BaseModel):
+    capacity: float
+    tx_action: BeamAction
+
 class OptimizationResult(BaseModel):
     success: bool
     message: str
-    best_capacity: float
-    tx_actions: List[BeamAction]
-    rx_actions: List[BeamAction]
+    total_capacity: float
+    results: List[LinkResult]
     training_time: float
 
 # --- API Endpoint ---
 @app.post("/optimize", response_model=OptimizationResult)
-async def optimize_beams(request: OptimizationRequest): # <<< KEY CHANGE 1: Added request parameter
+async def optimize_beams(request: OptimizationRequest):
     try:
-        # <<< KEY CHANGE 2: Log the received data for debugging
-        print(f"Received request: TX at ({request.tx_position.x}, {request.tx_position.y}), RX at ({request.rx_position.x}, {request.rx_position.y})")
+        print(f"Received request for {len(request.links)} links.")
         start_time = time.time()
 
-        # <<< KEY CHANGE 3: Use positions from the request instead of hardcoded values
-        tx_position = (request.tx_position.x, request.tx_position.y)
-        rx_position = (request.rx_position.x, request.rx_position.y)
+        # Extract link data from the request
+        links_data = [
+            {'tx_pos': (link.tx_position.x, link.tx_position.y), 'rx_pos': (link.rx_position.x, link.rx_position.y)}
+            for link in request.links
+        ]
 
-        env = BeamEnvironment2D(tx_pos=tx_position, rx_pos=rx_position, num_steps=36)
-        agent = QLearningAgent(env, alpha=0.1, gamma=0.9, epsilon=0.1)
+        # Initialize the new environment and agent
+        env = MultiBeamEnvironment2D(links=links_data, num_steps=36)
+        agent = MultiLinkQLearningAgent(env, alpha=0.1, gamma=0.9, epsilon=0.1)
 
         print("Training agent...")
-        tx_actions, rx_actions, best_capacity = agent.train(episodes=1000)
+        # The agent now returns a list of results and the total capacity
+        results, total_capacity = agent.train(episodes=2000)
         end_time = time.time()
         training_time = end_time - start_time
         print(f"Training finished in {training_time:.2f} seconds.")
 
         return OptimizationResult(
             success=True,
-            message="2D Optimization completed successfully using Q-Learning!",
-            best_capacity=best_capacity,
-            tx_actions=[BeamAction(azimuth=az, elevation=el) for az, el in tx_actions],
-            rx_actions=[BeamAction(azimuth=az, elevation=el) for az, el in rx_actions],
+            message=f"{len(request.links)}-Link Optimization completed successfully!",
+            total_capacity=total_capacity,
+            results=results,
             training_time=training_time,
         )
-
     except Exception as e:
         print(f"An error occurred during optimization: {e}")
-        return OptimizationResult(success=False, message=str(e), best_capacity=0, tx_actions=[], rx_actions=[], training_time=0)
+        return OptimizationResult(success=False, message=str(e), total_capacity=0, results=[], training_time=0)
 
 @app.get("/")
 def read_root():

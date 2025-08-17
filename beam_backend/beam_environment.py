@@ -1,74 +1,135 @@
-
-
 import numpy as np
 
-class BeamEnvironment2D:
+class MultiBeamEnvironment2D:
     """
-    A 2D version of the environment
+    A 2D environment that simulates multiple transmitter/receiver links
+    that can interfere with each other.
     """
-    def __init__(self, tx_pos, rx_pos, num_steps=20):
+    def __init__(self, links, num_steps=20):
         """
-        The constructor for our 2D world.
+        The constructor for our multi-link 2D world.
 
         Args:
-            tx_pos (tuple): The 2D coordinates (x, y) of the transmitter.
-            rx_pos (tuple): The 2D coordinates (x, y) of the receiver.
+            links (list): A list of dictionaries, where each dict contains
+                          'tx_pos' and 'rx_pos' tuples.
             num_steps (int): The number of discrete steps for the azimuth angle.
         """
         # --- State and Action Space ---
-        # We only have one dimension of action now: the horizontal angle.
-        self.num_steps = num_steps
-        #linspace(start, stop, num, endpoint=true)
-        #so here it prints sequence of values and until stop if true stop is included 
-        #nums is how much points to be printed
-        self.azimuth_angles = np.linspace(0, 360, num_steps)
-        self.action_space_size = num_steps  # A single number, not a tuple!
+        self.num_azimuth_steps = num_steps
+        self.azimuth_angles = np.linspace(0, 360, self.num_azimuth_steps, endpoint=False)
+        self.num_links = len(links)
 
-        #Physical Setup
-        #converting the values and positions into array values
-        self.tx_pos = np.array(tx_pos)
-        self.rx_pos = np.array(rx_pos)
+        # The state/action space size is the number of possible angle combinations
+        self.state_space_size = self.num_azimuth_steps ** self.num_links
+        self.action_space_size = self.num_azimuth_steps ** self.num_links
 
-        #Initial State
-        # The state is just the current azimuth angle index.
-        #generating a random number for initial state
-        self.state = np.random.randint(num_steps)
+        # --- Physical Setup ---
+        self.links = []
+        for link in links:
+            self.links.append({
+                'tx_pos': np.array(link['tx_pos']),
+                'rx_pos': np.array(link['rx_pos'])
+            })
+
+        # The state is a single integer representing the tuple of all beam angles
+        self.state = np.random.randint(self.state_space_size)
+
+    def _to_state_index(self, angle_indices):
+        """Converts a tuple of angle indices (e.g., (a1, a2)) to a single integer."""
+        index = 0
+        for i, angle_idx in enumerate(angle_indices):
+            index += angle_idx * (self.num_azimuth_steps ** i)
+        return int(index)
+
+    def _to_angle_indices(self, state_index):
+        """Converts a single state index back to a tuple of angle indices."""
+        indices = []
+        for i in range(self.num_links):
+            index = state_index % self.num_azimuth_steps
+            indices.append(int(index))
+            state_index //= self.num_azimuth_steps
+        return tuple(indices)
 
     def reset(self):
-        """Resets the environment to a random starting angle."""
-        self.state = np.random.randint(self.num_steps)
+        """Resets the environment to a random starting state (combination of angles)."""
+        self.state = np.random.randint(self.state_space_size)
         return self.state
 
     def step(self, action):
         """
-        The agent gives us an action (an azimuth index).
-        We calculate the reward for that action.
+        The agent gives us a joint action (an index representing a tuple of angles).
+        We calculate the total network capacity as the reward.
         """
-        # The new state is simply the action that was taken.
+        # The new state is the action that was taken.
         self.state = action
-        reward = self._calculate_channel_capacity(action)
-        done = True
+        action_indices = self._to_angle_indices(action)
+        reward = self._calculate_network_capacity(action_indices)
+        done = True # Episodes are single-step in this model
         return self.state, reward, done
 
-    def _calculate_channel_capacity(self, action_idx):
+    def _get_beam_alignment(self, tx_pos, rx_pos, tx_angle_deg):
         """
-        The 2D physics simulation.
+        Calculates the alignment of a beam from a TX to an RX.
+        Returns a value between 0 and 1 (1 is perfect alignment).
         """
-        tx_az = self.azimuth_angles[action_idx]
-
-        # Convert angle to a 2D direction vector (x, y).
         tx_direction = np.array([
-            np.cos(np.deg2rad(tx_az)),
-            np.sin(np.deg2rad(tx_az))
+            np.cos(np.deg2rad(tx_angle_deg)),
+            np.sin(np.deg2rad(tx_angle_deg))
         ])
 
-        # The "perfect" direction vector from transmitter to receiver.
-        ideal_direction = self.rx_pos - self.tx_pos
+        # The "perfect" direction vector from the transmitter to the receiver.
+        ideal_direction = rx_pos - tx_pos
+        # Handle case where TX and RX are at the same position
+        if np.linalg.norm(ideal_direction) == 0:
+            return 1.0
         ideal_direction = ideal_direction / np.linalg.norm(ideal_direction)
 
         # Dot product measures alignment. 1 is perfect, -1 is opposite.
         alignment = np.dot(tx_direction, ideal_direction)
+        return max(0, alignment)
 
-        # Reward function: exaggerates the peak for good alignment.
-        channel_capacity = 10 * (max(0, alignment) ** 10)
-        return channel_capacity
+    def _calculate_network_capacity(self, action_indices):
+        """
+        Calculates the total capacity of the network for a given set of beam angles.
+        This is the core of the reward function.
+        """
+        capacities, _ = self.get_individual_capacities(action_indices)
+        return sum(capacities)
+
+    def get_individual_capacities(self, action_indices):
+        """
+        Calculates the individual capacity of each link, considering interference.
+        This is useful for breaking down the final results.
+        """
+        individual_capacities = []
+        total_capacity = 0
+        noise = 0.1  # Base noise floor to prevent division by zero
+
+        for i in range(self.num_links):
+            # --- Calculate Signal for link i ---
+            link_i = self.links[i]
+            tx_i_angle = self.azimuth_angles[action_indices[i]]
+            signal_alignment = self._get_beam_alignment(link_i['tx_pos'], link_i['rx_pos'], tx_i_angle)
+            # Power is proportional to alignment squared (or a higher power)
+            signal_power = 10 * (signal_alignment ** 10)
+
+            # --- Calculate Interference on link i from all other links ---
+            interference_power = 0
+            for j in range(self.num_links):
+                if i == j:
+                    continue # A link doesn't interfere with itself
+
+                # How much power from TX_j is hitting RX_i?
+                link_j = self.links[j]
+                tx_j_angle = self.azimuth_angles[action_indices[j]]
+                interference_alignment = self._get_beam_alignment(link_j['tx_pos'], link_i['rx_pos'], tx_j_angle)
+                interference_power += 10 * (interference_alignment ** 10)
+
+            # --- Calculate SINR and Capacity for link i ---
+            sinr = signal_power / (interference_power + noise)
+            # Shannon-Hartley theorem (simplified)
+            capacity = np.log2(1 + sinr)
+            individual_capacities.append(capacity)
+            total_capacity += capacity
+
+        return individual_capacities, total_capacity

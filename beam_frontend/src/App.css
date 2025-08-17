@@ -65,6 +65,21 @@ button:disabled {
   color: #61dafb;
 }
 
+/* --- Optional: Polished styles for the new elements in the results card --- */
+.results-card h4 {
+  color: #a2e9fc; /* Lighter accent color for subheadings */
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-size: calc(10px + 1.5vmin);
+}
+
+.results-card hr {
+  border: 0;
+  height: 1px;
+  background-color: #4a4f58; /* A more subtle horizontal line */
+  margin: 20px 0;
+}
+
 /* --- Styles for Main Layout (Controls and Chart) --- */
 .main-content {
   display: flex;
