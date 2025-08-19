@@ -7,15 +7,21 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+//chart.js is a js library used for making charts
+//usually react compares the virtual dom to dom and then renders
+//but the chart.js is made using html <canvas> element
+//<canvas> element is like a digital paintboard unlike <div> which will have the children inside it
+//so the react-chartjs-2 is a react wrapper around chart.js
 import { Scatter } from "react-chartjs-2";
 import "./App.css";
 
 // Register the components required for a scatter plot
+// this is used to draw traingular(cones) between tx and rx which represents beam
 const beamConePlugin = {
   id: "beamConePlugin",
   beforeDatasetsDraw(chart, args, pluginOptions) {
     const { ctx } = chart;
-    const { beamData } = pluginOptions;
+    const { beamData } = pluginOptions; //gets data through chartOptions.plugins.beamConePlugin
 
     if (!beamData || beamData.length === 0) {
       return;
@@ -23,19 +29,24 @@ const beamConePlugin = {
 
     const { x, y } = chart.scales;
 
+    //[{},{}]
     beamData.forEach((beam) => {
       const { txPos, rxPos, angle, color, beamwidth } = beam;
 
+      //convert degree to radian
       const angleRad = (angle * Math.PI) / 180;
       const beamwidthRad = (beamwidth * Math.PI) / 180;
+      //calculate the length of cone
+      // by subtracting dist between tx and rx and multiplying them by 1.2
       const beamLength = Math.hypot(rxPos.x - txPos.x, rxPos.y - txPos.y) * 1.2;
 
       // Get pixel coordinates from data values
       const p0 = {
-        x: x.getPixelForValue(txPos.x),
-        y: y.getPixelForValue(txPos.y),
+        x: x.getPixelForValue(txPos.x), //translates chart data to pixels for eg
+        y: y.getPixelForValue(txPos.y), //{x: 0, y: 25} might be 800 pixels wide × 600 pixels tall in canvas
       };
       const p1 = {
+        //left edge of cone
         x: x.getPixelForValue(
           txPos.x + beamLength * Math.cos(angleRad - beamwidthRad / 2)
         ),
@@ -43,6 +54,7 @@ const beamConePlugin = {
           txPos.y + beamLength * Math.sin(angleRad - beamwidthRad / 2)
         ),
       };
+      //right edge of cone
       const p2 = {
         x: x.getPixelForValue(
           txPos.x + beamLength * Math.cos(angleRad + beamwidthRad / 2)
@@ -87,28 +99,40 @@ function App() {
   const [error, setError] = useState(null);
 
   // A generic handler to update position state from input fields
+  // whenever the input values are changed this function is called
+  // the setState is passed to this function (setter)
+  // it is used as setter because all the setState can be passed here
+  //e is a event React object
+  //
+  //so here the setter return (e)=>{} function back then we get onChange={(e)=>{}} which gets executed again
   const handlePosChange = (setter) => (e) => {
+    //same as return (e)=>{}
+
+    //curried function or function factory.
     setter((prev) => ({
-      ...prev,
-      [e.target.name]: parseFloat(e.target.value) || 0,
+      //takes in existing state as prev
+      ...prev, //keeps all properties in state as it is (spread operator)
+      [e.target.name]: parseFloat(e.target.value) || 0, //only change the input value typed and here the .name is x and y
     }));
   };
 
   // The main function to call the backend API
   const handleOptimize = async () => {
     console.log("Button clicked! Starting optimization process...");
-    setIsLoading(true);
-    setResult(null);
-    setError(null);
+    setIsLoading(true); //shows loading
+    setResult(null); //clears last result
+    setError(null); //clears error
 
     try {
+      //sending positions to backend
       const response = await fetch("http://localhost:8000/optimize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        //we can only send text or binary data so we stringify it
         body: JSON.stringify({
-          // This is a new, hypothetical API structure for multiple links
+          // This is a new, API structure for multiple links
           links: [
             { tx_position: tx1Pos, rx_position: rx1Pos },
             { tx_position: tx2Pos, rx_position: rx2Pos },
@@ -116,10 +140,12 @@ function App() {
         }),
       });
 
+      //network succeeded but HTTP might be an error (400/500...)
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
+      //parse JSON and store it
       const data = await response.json();
       console.log("Received data from backend:", data);
       setResult(data);
@@ -276,7 +302,8 @@ function App() {
                   type="number"
                   name="x"
                   value={tx1Pos.x}
-                  onChange={handlePosChange(setTx1Pos)}
+                  onChange={handlePosChange(setTx1Pos)} //whenever input value is changed this func is called
+                  //first receives (e)=>{} as return func which is executed again
                 />
               </label>
               <label>
@@ -415,3 +442,75 @@ function App() {
 }
 
 export default App;
+
+//HIGHER ORDER FUNCTIONS takes function as input and return a function after operating on it
+/* // A function that takes another function as an argument
+function applyOperation(x, y, operation) {
+  return operation(x, y);
+}
+
+function add(a, b) {
+  return a + b;
+}
+
+console.log(applyOperation(5, 3, add)); // 8 
+// 
+
+eg 2 
+
+function multiplier(factor) {
+  return function (x) {
+    return x * factor; // return x*2
+  };
+}
+
+const double = multiplier(2); gets function as return in double
+console.log(double(5)); // 10 execute the double function
+
+CURRIED FUNCTIONS
+function addCurried(a) {
+  return function(b) {
+    return a + b;
+  };
+}
+console.log(addCurried(2)(3)); // 5
+
+addCurried(2)
+
+Executes addCurried with a = 2.
+
+Returns a function (b) => a + b.
+
+At this moment, nothing is executed automatically — you just got a function back.
+
+(3)
+
+Immediately calls the function that was returned from step 1, passing b = 3.
+
+Now it calculates 2 + 3 = 5.
+
+
+
+json 
+{
+  "success": true,
+  "message": "Optimized successfully",
+  "total_capacity": 3.4567,
+  "training_time": 1.23,
+  "results": [
+    { "capacity": 1.789, "tx_action": { "azimuth": 32.5 } },
+    { "capacity": 1.667, "tx_action": { "azimuth": -15.0 } }
+  ]
+}
+
+
+BEAM DATA 
+{
+  txPos: { x, y },
+  rxPos: { x, y },
+  angle: <degrees>,
+  color: "rgba(...)",
+  beamwidth: <degrees>
+}
+
+*/
