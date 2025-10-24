@@ -6,13 +6,15 @@ import {
   LineElement,
   Tooltip,
   Legend,
+  CategoryScale,
+  BarElement,
 } from "chart.js";
 //chart.js is a js library used for making charts
 //usually react compares the virtual dom to dom and then renders
 //but the chart.js is made using html <canvas> element
 //<canvas> element is like a digital paintboard unlike <div> which will have the children inside it
 //so the react-chartjs-2 is a react wrapper around chart.js
-import { Scatter } from "react-chartjs-2";
+import { Scatter, Bar } from "react-chartjs-2";
 import "./App.css";
 
 // Register the components required for a scatter plot
@@ -83,6 +85,8 @@ ChartJS.register(
   LineElement,
   Tooltip,
   Legend,
+  CategoryScale,
+  BarElement,
   beamConePlugin
 );
 
@@ -97,6 +101,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedModel, setSelectedModel] = useState("q_learning");
+  const [comparisonResults, setComparisonResults] = useState([]);
+  const [showComparison, setShowComparison] = useState(false);
 
   // A generic handler to update position state from input fields
   // whenever the input values are changed this function is called
@@ -117,10 +124,12 @@ function App() {
   };
 
   // The main function to call the backend API
-  const handleOptimize = async () => {
+  const handleOptimize = async (addToComparison = false) => {
     console.log("Button clicked! Starting optimization process...");
     setIsLoading(true); //shows loading
-    setResult(null); //clears last result
+    if (!addToComparison) {
+      setResult(null); //clears last result
+    }
     setError(null); //clears error
 
     try {
@@ -137,6 +146,7 @@ function App() {
             { tx_position: tx1Pos, rx_position: rx1Pos },
             { tx_position: tx2Pos, rx_position: rx2Pos },
           ],
+          algorithm_type: selectedModel,
         }),
       });
 
@@ -148,13 +158,77 @@ function App() {
       //parse JSON and store it
       const data = await response.json();
       console.log("Received data from backend:", data);
-      setResult(data);
+      
+      if (addToComparison) {
+        // Add to comparison results
+        setComparisonResults(prev => [...prev, {
+          ...data,
+          timestamp: new Date().toLocaleTimeString()
+        }]);
+        setShowComparison(true);
+      } else {
+        // Set as single result
+        setResult(data);
+        setShowComparison(false);
+      }
     } catch (e) {
       console.error("An error occurred:", e.message);
       setError(e.message);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Clear comparison results
+  const clearComparison = () => {
+    setComparisonResults([]);
+    setShowComparison(false);
+  };
+
+  // Prepare comparison chart data
+  const prepareComparisonChartData = () => {
+    if (comparisonResults.length === 0) return null;
+
+    const algorithms = comparisonResults.map(r => r.algorithm_type.replace('_', ' ').toUpperCase());
+    const totalCapacities = comparisonResults.map(r => r.total_capacity);
+    const trainingTimes = comparisonResults.map(r => r.training_time);
+    const link1Capacities = comparisonResults.map(r => r.results[0].capacity);
+    const link2Capacities = comparisonResults.map(r => r.results[1].capacity);
+
+    return {
+      labels: algorithms,
+      datasets: [
+        {
+          label: 'Total Capacity (Gbps)',
+          data: totalCapacities,
+          backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Link 1 Capacity (Gbps)',
+          data: link1Capacities,
+          backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Link 2 Capacity (Gbps)',
+          data: link2Capacities,
+          backgroundColor: 'rgba(153, 102, 255, 0.6)',
+          borderColor: 'rgba(153, 102, 255, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Training Time (seconds)',
+          data: trainingTimes,
+          backgroundColor: 'rgba(255, 159, 64, 0.6)',
+          borderColor: 'rgba(255, 159, 64, 1)',
+          borderWidth: 1,
+          yAxisID: 'y1',
+        }
+      ]
+    };
   };
 
   // Prepare the data object for the chart
@@ -295,6 +369,51 @@ function App() {
         <div className="main-content">
           <div className="controls">
             <div className="input-group">
+              <h3>RL Algorithm Selection</h3>
+              <label>
+                Model Type:{" "}
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: "14px",
+                    marginLeft: "10px",
+                    backgroundColor: "#2a2a2a",
+                    color: "white",
+                    border: "1px solid #555",
+                    borderRadius: "4px",
+                    outline: "none",
+                  }}
+                >
+                  <option
+                    value="q_learning"
+                    style={{ backgroundColor: "#2a2a2a", color: "white" }}
+                  >
+                    Q-Learning
+                  </option>
+                  <option
+                    value="sarsa"
+                    style={{ backgroundColor: "#2a2a2a", color: "white" }}
+                  >
+                    SARSA
+                  </option>
+                  <option
+                    value="double_q"
+                    style={{ backgroundColor: "#2a2a2a", color: "white" }}
+                  >
+                    Double Q-Learning
+                  </option>
+                  <option
+                    value="expected_sarsa"
+                    style={{ backgroundColor: "#2a2a2a", color: "white" }}
+                  >
+                    Expected SARSA
+                  </option>
+                </select>
+              </label>
+            </div>
+            <div className="input-group">
               <h3>Transmitter 1 (TX1)</h3>
               <label>
                 X:{" "}
@@ -385,9 +504,42 @@ function App() {
           </div>
         </div>
 
-        <button onClick={handleOptimize} disabled={isLoading}>
-          {isLoading ? "Optimizing..." : "Run 2D Optimization"}
-        </button>
+        <div className="button-group">
+          <button onClick={() => handleOptimize(false)} disabled={isLoading}>
+            {isLoading
+              ? `Optimizing with ${selectedModel
+                  .replace("_", " ")
+                  .toUpperCase()}...`
+              : `Run ${selectedModel
+                  .replace("_", " ")
+                  .toUpperCase()} Optimization`}
+          </button>
+          
+          <button 
+            onClick={() => handleOptimize(true)} 
+            disabled={isLoading}
+            style={{ 
+              backgroundColor: "#4CAF50", 
+              marginLeft: "10px",
+              padding: "10px 15px"
+            }}
+          >
+            {isLoading ? "Adding to Comparison..." : "Add to Comparison"}
+          </button>
+          
+          {comparisonResults.length > 0 && (
+            <button 
+              onClick={clearComparison}
+              style={{ 
+                backgroundColor: "#f44336", 
+                marginLeft: "10px",
+                padding: "10px 15px"
+              }}
+            >
+              Clear Comparison ({comparisonResults.length})
+            </button>
+          )}
+        </div>
 
         {result && (
           <div className="results-card">
@@ -397,6 +549,10 @@ function App() {
             </p>
             <p>
               <strong>Message:</strong> {result.message}
+            </p>
+            <p>
+              <strong>Algorithm Used:</strong>{" "}
+              {result.algorithm_type.replace("_", " ").toUpperCase()}
             </p>
             <p>
               <strong>Total Capacity:</strong>{" "}
@@ -427,6 +583,65 @@ function App() {
               <strong>Training Time:</strong> {result.training_time.toFixed(2)}{" "}
               seconds
             </p>
+          </div>
+        )}
+
+        {showComparison && comparisonResults.length > 0 && (
+          <div className="comparison-card">
+            <h2>Algorithm Comparison</h2>
+            <div className="comparison-chart-container">
+              <Bar 
+                data={prepareComparisonChartData()} 
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Algorithm Performance Comparison',
+                      color: 'white',
+                      font: { size: 16 }
+                    },
+                    legend: {
+                      labels: { color: 'white' }
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      title: { display: true, text: 'Capacity (Gbps)', color: 'white' },
+                      grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                      ticks: { color: 'white' }
+                    },
+                    y1: {
+                      type: 'linear',
+                      display: true,
+                      position: 'right',
+                      title: { display: true, text: 'Training Time (seconds)', color: 'white' },
+                      grid: { drawOnChartArea: false },
+                      ticks: { color: 'white' }
+                    },
+                    x: {
+                      title: { display: true, text: 'Algorithm', color: 'white' },
+                      grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                      ticks: { color: 'white' }
+                    }
+                  }
+                }}
+              />
+            </div>
+            
+            <div className="comparison-summary">
+              <h3>Comparison Summary</h3>
+              {comparisonResults.map((result, index) => (
+                <div key={index} className="comparison-item">
+                  <h4>{result.algorithm_type.replace('_', ' ').toUpperCase()}</h4>
+                  <p><strong>Total Capacity:</strong> {result.total_capacity.toFixed(4)} Gbps</p>
+                  <p><strong>Training Time:</strong> {result.training_time.toFixed(2)} seconds</p>
+                  <p><strong>Run Time:</strong> {result.timestamp}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
