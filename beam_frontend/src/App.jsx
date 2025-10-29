@@ -158,13 +158,16 @@ function App() {
       //parse JSON and store it
       const data = await response.json();
       console.log("Received data from backend:", data);
-      
+
       if (addToComparison) {
         // Add to comparison results
-        setComparisonResults(prev => [...prev, {
-          ...data,
-          timestamp: new Date().toLocaleTimeString()
-        }]);
+        setComparisonResults((prev) => [
+          ...prev,
+          {
+            ...data,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
         setShowComparison(true);
       } else {
         // Set as single result
@@ -185,49 +188,29 @@ function App() {
     setShowComparison(false);
   };
 
-  // Prepare comparison chart data
+  // Prepare comparison chart data (Max Power only)
   const prepareComparisonChartData = () => {
     if (comparisonResults.length === 0) return null;
 
-    const algorithms = comparisonResults.map(r => r.algorithm_type.replace('_', ' ').toUpperCase());
-    const totalCapacities = comparisonResults.map(r => r.total_capacity);
-    const trainingTimes = comparisonResults.map(r => r.training_time);
-    const link1Capacities = comparisonResults.map(r => r.results[0].capacity);
-    const link2Capacities = comparisonResults.map(r => r.results[1].capacity);
+    const algorithms = comparisonResults.map((r) =>
+      r.algorithm_type.replace("_", " ").toUpperCase()
+    );
+    // Interpret "Max Power" as the maximum per-link capacity achieved in the result
+    const maxPowers = comparisonResults.map((r) =>
+      Math.max(...r.results.map((res) => res.capacity))
+    );
 
     return {
       labels: algorithms,
       datasets: [
         {
-          label: 'Total Capacity (Gbps)',
-          data: totalCapacities,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
+          label: "Max Power (Gbps)",
+          data: maxPowers,
+          backgroundColor: "rgba(76, 175, 80, 0.6)",
+          borderColor: "rgba(76, 175, 80, 1)",
           borderWidth: 1,
         },
-        {
-          label: 'Link 1 Capacity (Gbps)',
-          data: link1Capacities,
-          backgroundColor: 'rgba(255, 99, 132, 0.6)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 1,
-        },
-        {
-          label: 'Link 2 Capacity (Gbps)',
-          data: link2Capacities,
-          backgroundColor: 'rgba(153, 102, 255, 0.6)',
-          borderColor: 'rgba(153, 102, 255, 1)',
-          borderWidth: 1,
-        },
-        {
-          label: 'Training Time (seconds)',
-          data: trainingTimes,
-          backgroundColor: 'rgba(255, 159, 64, 0.6)',
-          borderColor: 'rgba(255, 159, 64, 1)',
-          borderWidth: 1,
-          yAxisID: 'y1',
-        }
-      ]
+      ],
     };
   };
 
@@ -514,26 +497,26 @@ function App() {
                   .replace("_", " ")
                   .toUpperCase()} Optimization`}
           </button>
-          
-          <button 
-            onClick={() => handleOptimize(true)} 
+
+          <button
+            onClick={() => handleOptimize(true)}
             disabled={isLoading}
-            style={{ 
-              backgroundColor: "#4CAF50", 
+            style={{
+              backgroundColor: "#4CAF50",
               marginLeft: "10px",
-              padding: "10px 15px"
+              padding: "10px 15px",
             }}
           >
             {isLoading ? "Adding to Comparison..." : "Add to Comparison"}
           </button>
-          
+
           {comparisonResults.length > 0 && (
-            <button 
+            <button
               onClick={clearComparison}
-              style={{ 
-                backgroundColor: "#f44336", 
+              style={{
+                backgroundColor: "#f44336",
                 marginLeft: "10px",
-                padding: "10px 15px"
+                padding: "10px 15px",
               }}
             >
               Clear Comparison ({comparisonResults.length})
@@ -590,55 +573,65 @@ function App() {
           <div className="comparison-card">
             <h2>Algorithm Comparison</h2>
             <div className="comparison-chart-container">
-              <Bar 
-                data={prepareComparisonChartData()} 
+              <Bar
+                data={prepareComparisonChartData()}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
                   plugins: {
                     title: {
                       display: true,
-                      text: 'Algorithm Performance Comparison',
-                      color: 'white',
-                      font: { size: 16 }
+                      text: "Max Power by Algorithm",
+                      color: "white",
+                      font: { size: 16 },
                     },
                     legend: {
-                      labels: { color: 'white' }
-                    }
+                      labels: { color: "white" },
+                    },
                   },
                   scales: {
                     y: {
                       beginAtZero: true,
-                      title: { display: true, text: 'Capacity (Gbps)', color: 'white' },
-                      grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                      ticks: { color: 'white' }
-                    },
-                    y1: {
-                      type: 'linear',
-                      display: true,
-                      position: 'right',
-                      title: { display: true, text: 'Training Time (seconds)', color: 'white' },
-                      grid: { drawOnChartArea: false },
-                      ticks: { color: 'white' }
+                      title: {
+                        display: true,
+                        text: "Max Power (Gbps)",
+                        color: "white",
+                      },
+                      grid: { color: "rgba(255, 255, 255, 0.1)" },
+                      ticks: { color: "white" },
                     },
                     x: {
-                      title: { display: true, text: 'Algorithm', color: 'white' },
-                      grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                      ticks: { color: 'white' }
-                    }
-                  }
+                      title: {
+                        display: true,
+                        text: "Algorithm",
+                        color: "white",
+                      },
+                      grid: { color: "rgba(255, 255, 255, 0.1)" },
+                      ticks: { color: "white" },
+                    },
+                  },
                 }}
               />
             </div>
-            
+
             <div className="comparison-summary">
               <h3>Comparison Summary</h3>
               {comparisonResults.map((result, index) => (
                 <div key={index} className="comparison-item">
-                  <h4>{result.algorithm_type.replace('_', ' ').toUpperCase()}</h4>
-                  <p><strong>Total Capacity:</strong> {result.total_capacity.toFixed(4)} Gbps</p>
-                  <p><strong>Training Time:</strong> {result.training_time.toFixed(2)} seconds</p>
-                  <p><strong>Run Time:</strong> {result.timestamp}</p>
+                  <h4>
+                    {result.algorithm_type.replace("_", " ").toUpperCase()}
+                  </h4>
+                  <p>
+                    <strong>Total Capacity:</strong>{" "}
+                    {result.total_capacity.toFixed(4)} Gbps
+                  </p>
+                  <p>
+                    <strong>Training Time:</strong>{" "}
+                    {result.training_time.toFixed(2)} seconds
+                  </p>
+                  <p>
+                    <strong>Run Time:</strong> {result.timestamp}
+                  </p>
                 </div>
               ))}
             </div>
